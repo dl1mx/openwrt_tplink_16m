@@ -941,3 +941,24 @@ define Device/tplink_wbs510-v2
   TPLINK_BOARD_ID := WBS510V2
 endef
 TARGET_DEVICES += tplink_wbs510-v2
+
+define Device/tplink_tl-wr841-v9-16m
+  $(Device/tplink-16mlzma)
+  SOC := qca9533
+  DEVICE_MODEL := TL-WR841N/ND (Mod 16M)
+  DEVICE_VARIANT := v9
+  TPLINK_HWID := 0x08410009
+  SUPPORTED_DEVICES += tl-wr841-v9-16m
+endef
+TARGET_DEVICES += tplink_tl-wr841-v9-16m
+
+define Device/tplink_tl-mr3020-v1-16m
+  $(Device/tplink-16mlzma)
+  SOC := ar9331
+  DEVICE_MODEL := TL-MR3020 (Mod 16M)
+  DEVICE_VARIANT := v1
+  DEVICE_PACKAGES := kmod-usb-chipidea2 kmod-usb-ledtrig-usbport
+  TPLINK_HWID := 0x30200001
+  SUPPORTED_DEVICES += tl-mr3020-16m
+endef
+TARGET_DEVICES += tplink_tl-mr3020-v1-16m
