@@ -65,7 +65,7 @@ define KernelPackage/ata-ahci-platform
     $(LINUX_DIR)/drivers/ata/ahci_platform.ko \
     $(LINUX_DIR)/drivers/ata/libahci_platform.ko
   AUTOLOAD:=$(call AutoLoad,40,libahci libahci_platform ahci_platform,1)
-  $(call AddDepends/ata,@TARGET_ipq806x||TARGET_layerscape||TARGET_sunxi)
+  $(call AddDepends/ata,@TARGET_ipq806x||TARGET_layerscape||TARGET_rockchip||TARGET_sunxi)
 endef
 
 define KernelPackage/ata-ahci-platform/description
@@ -89,6 +89,18 @@ endef
 
 $(eval $(call KernelPackage,ata-artop))
 
+define KernelPackage/ata-ahci-dwc
+  TITLE:=Synopsys DWC AHCI SATA
+  KCONFIG:= \
+	CONFIG_AHCI_DWC \
+	CONFIG_SATA_HOST=y
+  FILES:=$(LINUX_DIR)/drivers/ata/ahci_dwc.ko
+  DEPENDS:=+kmod-ata-ahci-platform
+  AUTOLOAD:=$(call AutoLoad,41,ahci_dwc,1)
+  $(call AddDepends/ata,@TARGET_rockchip)
+endef
+
+$(eval $(call KernelPackage,ata-ahci-dwc))
 
 define KernelPackage/ata-nvidia-sata
   TITLE:=Nvidia Serial ATA support
@@ -263,7 +275,7 @@ define KernelPackage/iscsi-initiator
 	CONFIG_INET \
 	CONFIG_SCSI_LOWLEVEL=y \
 	CONFIG_ISCSI_TCP \
-	CONFIG_SCSI_ISCSI_ATTRS=y
+	CONFIG_SCSI_ISCSI_ATTRS
   FILES:= \
 	$(LINUX_DIR)/drivers/scsi/iscsi_tcp.ko \
 	$(LINUX_DIR)/drivers/scsi/libiscsi.ko \
@@ -368,7 +380,7 @@ $(eval $(call KernelPackage,md-raid10))
 
 
 define KernelPackage/md-raid456
-$(call KernelPackage/md/Depends,+kmod-lib-raid6 +kmod-lib-xor +kmod-lib-crc32c)
+$(call KernelPackage/md/Depends,+kmod-lib-raid6 +kmod-lib-xor +LINUX_6_12:kmod-lib-crc32c)
   TITLE:=RAID Level 456 Driver
   KCONFIG:= \
        CONFIG_ASYNC_CORE \
@@ -404,21 +416,6 @@ define KernelPackage/md-raid456/description
 endef
 
 $(eval $(call KernelPackage,md-raid456))
-
-
-define KernelPackage/md-multipath
-$(call KernelPackage/md/Depends,)
-  TITLE:=MD Multipath Module
-  KCONFIG:=CONFIG_MD_MULTIPATH
-  FILES:=$(LINUX_DIR)/drivers/md/multipath.ko
-  AUTOLOAD:=$(call AutoLoad,29,multipath)
-endef
-
-define KernelPackage/md-multipath/description
- Multipath driver module (multipath.ko)
-endef
-
-$(eval $(call KernelPackage,md-multipath))
 
 
 define KernelPackage/libsas
@@ -496,16 +493,16 @@ $(eval $(call KernelPackage,nbd))
 define KernelPackage/nvme
   SUBMENU:=$(BLOCK_MENU)
   TITLE:=NVM Express block device
-  DEPENDS:=@PCI_SUPPORT
+  DEPENDS:=@PCI_SUPPORT +kmod-hwmon-core
   KCONFIG:= \
 	CONFIG_NVME_CORE \
 	CONFIG_BLK_DEV_NVME \
 	CONFIG_NVME_MULTIPATH=n \
-	CONFIG_NVME_HWMON=n
+	CONFIG_NVME_HWMON=y
   FILES:= \
 	$(LINUX_DIR)/drivers/nvme/host/nvme-core.ko \
 	$(LINUX_DIR)/drivers/nvme/host/nvme.ko
-  AUTOLOAD:=$(call AutoLoad,30,nvme-core nvme)
+  AUTOLOAD:=$(call AutoLoad,30,nvme-core nvme,1)
 endef
 
 define KernelPackage/nvme/description
@@ -521,13 +518,13 @@ define KernelPackage/scsi-core
   TITLE:=SCSI device support
   KCONFIG:= \
 	CONFIG_SCSI \
-	CONFIG_SCSI_COMMON@ge5.15 \
+	CONFIG_SCSI_COMMON \
 	CONFIG_BLK_DEV_SD
   FILES:= \
 	$(LINUX_DIR)/drivers/scsi/scsi_mod.ko \
-	$(LINUX_DIR)/drivers/scsi/scsi_common.ko@ge5.15 \
+	$(LINUX_DIR)/drivers/scsi/scsi_common.ko \
 	$(LINUX_DIR)/drivers/scsi/sd_mod.ko
-  AUTOLOAD:=$(call AutoLoad,40,scsi_mod scsi_common@ge5.15 sd_mod,1)
+  AUTOLOAD:=$(call AutoLoad,40,scsi_mod scsi_common sd_mod,1)
 endef
 
 $(eval $(call KernelPackage,scsi-core))

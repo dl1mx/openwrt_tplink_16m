@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=dnsmasq
-PKG_UPSTREAM_VERSION:=2.87
+PKG_UPSTREAM_VERSION:=2.92
 PKG_VERSION:=$(subst test,~~test,$(subst rc,~rc,$(PKG_UPSTREAM_VERSION)))
-PKG_RELEASE:=$(AUTORELEASE)
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_UPSTREAM_VERSION).tar.xz
 PKG_SOURCE_URL:=https://thekelleys.org.uk/dnsmasq/
-PKG_HASH:=0228c0364a7f2356fd7e7f1549937cbf3099a78d3b2eb1ba5bb0c31e2b89de7a
+PKG_HASH:=4bf50c2c1018f9fbc26037df51b90ecea0cb73d46162846763b92df0d6c3a458
 
 PKG_LICENSE:=GPL-2.0
 PKG_LICENSE_FILES:=COPYING
@@ -24,6 +24,7 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(BUILD_VARIANT)/$(PKG_NAME)-$(PKG_UPSTR
 
 PKG_INSTALL:=1
 PKG_BUILD_PARALLEL:=1
+PKG_BUILD_FLAGS:=lto
 PKG_ASLR_PIE_REGULAR:=1
 PKG_CONFIG_DEPENDS:= CONFIG_PACKAGE_dnsmasq_$(BUILD_VARIANT)_dhcp \
 	CONFIG_PACKAGE_dnsmasq_$(BUILD_VARIANT)_dhcpv6 \
@@ -50,6 +51,7 @@ endef
 define Package/dnsmasq
 $(call Package/dnsmasq/Default)
   VARIANT:=nodhcpv6
+  DEFAULT_VARIANT:=1
 endef
 
 define Package/dnsmasq-dhcpv6
@@ -132,9 +134,6 @@ endef
 
 Package/dnsmasq-dhcpv6/conffiles = $(Package/dnsmasq/conffiles)
 Package/dnsmasq-full/conffiles = $(Package/dnsmasq/conffiles)
-
-TARGET_CFLAGS += -flto
-TARGET_LDFLAGS += -flto=jobserver
 
 COPTS = -DHAVE_UBUS -DHAVE_POLL_H \
 	$(if $(CONFIG_IPV6),,-DNO_IPV6)

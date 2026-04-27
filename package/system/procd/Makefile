@@ -8,13 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=procd
-PKG_RELEASE:=$(AUTORELEASE)
+PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL=$(PROJECT_GIT)/project/procd.git
-PKG_MIRROR_HASH:=d60b4aa9d47d75e906dfd812528a1bc28e91f5af72a9d9275056b71b19d99f04
-PKG_SOURCE_DATE:=2022-11-10
-PKG_SOURCE_VERSION:=039b88f75367203e540009cc97603b1bce3fafa6
+PKG_MIRROR_HASH:=cad2707975d99c861065516f250029c872c95441eb85da36024368f601f77b99
+PKG_SOURCE_DATE:=2026-03-25
+PKG_SOURCE_VERSION:=cd7a4e5f8b8e4e7ce38f7e2be577802b7ec4ff3e
 CMAKE_INSTALL:=1
 
 PKG_LICENSE:=GPL-2.0
@@ -22,6 +22,7 @@ PKG_LICENSE_FILES:=
 
 PKG_MAINTAINER:=John Crispin <john@phrozen.org>
 
+PKG_BUILD_FLAGS:=lto
 PKG_ASLR_PIE_REGULAR:=1
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_TARGET_INIT_PATH CONFIG_KERNEL_SECCOMP CONFIG_PROCD_SHOW_BOOT \
@@ -35,15 +36,11 @@ ifeq ($(DUMP),)
 endif
 
 CMAKE_OPTIONS += -DEARLY_PATH="$(TARGET_INIT_PATH)"
-TARGET_LDFLAGS += $(if $(CONFIG_USE_GLIBC),-lrt)
-
-TARGET_CFLAGS += -flto
-TARGET_LDFLAGS += -flto
 
 define Package/procd/Default
   SECTION:=base
   CATEGORY:=Base system
-  DEPENDS:=+ubusd +ubus +libjson-script +ubox +USE_GLIBC:librt +libubox \
+  DEPENDS:=+ubusd +ubus +libjson-script +ubox +libubox +libudebug \
 	  +libubus +libblobmsg-json +libjson-c +jshn
   TITLE:=OpenWrt system process manager
   USERID:=:dialout=20 :audio=29
@@ -53,6 +50,7 @@ define Package/procd
   $(call Package/procd/Default)
   VARIANT:=default
   CONFLICTS:=procd-selinux
+  DEFAULT_VARIANT:=1
 endef
 
 define Package/procd-selinux
@@ -74,7 +72,7 @@ endef
 define Package/procd-seccomp
   SECTION:=base
   CATEGORY:=Base system
-  DEPENDS:=@SECCOMP +libubox +libblobmsg-json
+  DEPENDS:=@USE_SECCOMP +libubox +libblobmsg-json
   TITLE:=OpenWrt process seccomp helper + utrace
 endef
 

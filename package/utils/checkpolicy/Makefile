@@ -6,12 +6,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=checkpolicy
-PKG_VERSION:=3.3
+PKG_VERSION:=3.9
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/SELinuxProject/selinux/releases/download/$(PKG_VERSION)
-PKG_HASH:=25c84edfa3a10ab8cb073b97bc55cb66377532d54a2723da9accdabd05431485
+PKG_HASH:=dd85b0173ca6e96b22ebf472bcbccf04eb10e1aa07add8f1b7e0e9e8e995e027
 PKG_INSTALL:=1
 PKG_BUILD_DEPENDS:=libselinux
 HOST_BUILD_DEPENDS:=libselinux/host
@@ -27,7 +27,7 @@ define Package/checkpolicy
   SECTION:=utils
   CATEGORY:=Utilities
   TITLE:=SELinux policy compiler
-  URL:=http://selinuxproject.org/page/Main_Page
+  URL:=https://github.com/selinuxproject
 endef
 
 define Package/checkpolicy/description

@@ -15,6 +15,7 @@
 #include <linux/of_net.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
+#include <linux/version.h>
 #include "ag71xx.h"
 
 #define AG71XX_DEFAULT_MSG_ENABLE	\
@@ -333,7 +334,7 @@ static unsigned char *ag71xx_speed_str(struct ag71xx *ag)
 	return "?";
 }
 
-static void ag71xx_hw_set_macaddr(struct ag71xx *ag, unsigned char *mac)
+static void ag71xx_hw_set_macaddr(struct ag71xx *ag, const unsigned char *mac)
 {
 	u32 t;
 
@@ -407,11 +408,11 @@ static void ag71xx_dma_reset(struct ag71xx *ag)
 			 FIFO_CFG4_VT)
 
 #define FIFO_CFG5_INIT	(FIFO_CFG5_DE | FIFO_CFG5_DV | FIFO_CFG5_FC | \
-			 FIFO_CFG5_CE | FIFO_CFG5_LO | FIFO_CFG5_OK | \
-			 FIFO_CFG5_MC | FIFO_CFG5_BC | FIFO_CFG5_DR | \
-			 FIFO_CFG5_CF | FIFO_CFG5_PF | FIFO_CFG5_VT | \
-			 FIFO_CFG5_LE | FIFO_CFG5_FT | FIFO_CFG5_16 | \
-			 FIFO_CFG5_17 | FIFO_CFG5_SF)
+			 FIFO_CFG5_CE | FIFO_CFG5_LM | FIFO_CFG5_LO | \
+			 FIFO_CFG5_OK | FIFO_CFG5_MC | FIFO_CFG5_BC | \
+			 FIFO_CFG5_DR | FIFO_CFG5_CF | FIFO_CFG5_UO | \
+			 FIFO_CFG5_VT | FIFO_CFG5_LE | FIFO_CFG5_FT | \
+			 FIFO_CFG5_UC | FIFO_CFG5_SF)
 
 static void ag71xx_hw_stop(struct ag71xx *ag)
 {
@@ -990,7 +991,11 @@ static void ag71xx_hw_disable(struct ag71xx *ag)
 	ag71xx_dma_reset(ag);
 
 	napi_disable(&ag->napi);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,16,0)
 	del_timer_sync(&ag->oom_timer);
+#else
+	timer_delete_sync(&ag->oom_timer);
+#endif
 
 	ag71xx_rings_cleanup(ag);
 }
@@ -1162,38 +1167,19 @@ static int ag71xx_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ag71xx *ag = netdev_priv(dev);
 
+	if (ag->phy_dev == NULL)
+		return -ENODEV;
 
-	switch (cmd) {
-	case SIOCSIFHWADDR:
-		if (copy_from_user
-			(dev->dev_addr, ifr->ifr_data, sizeof(dev->dev_addr)))
-			return -EFAULT;
-		return 0;
-
-	case SIOCGIFHWADDR:
-		if (copy_to_user
-			(ifr->ifr_data, dev->dev_addr, sizeof(dev->dev_addr)))
-			return -EFAULT;
-		return 0;
-
-	case SIOCGMIIPHY:
-	case SIOCGMIIREG:
-	case SIOCSMIIREG:
-		if (ag->phy_dev == NULL)
-			break;
-
-		return phy_mii_ioctl(ag->phy_dev, ifr, cmd);
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	return phy_mii_ioctl(ag->phy_dev, ifr, cmd);
 }
 
 static void ag71xx_oom_timer_handler(struct timer_list *t)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,16,0)
 	struct ag71xx *ag = from_timer(ag, t, oom_timer);
+#else
+	struct ag71xx *ag = timer_container_of(ag, t, oom_timer);
+#endif
 
 	napi_schedule(&ag->napi);
 }
@@ -1319,7 +1305,6 @@ static int ag71xx_rx_packets(struct ag71xx *ag, int limit)
 	int ring_mask = BIT(ring->order) - 1;
 	int ring_size = BIT(ring->order);
 	struct list_head rx_list;
-	struct sk_buff *next;
 	struct sk_buff *skb;
 	int done = 0;
 
@@ -1352,11 +1337,7 @@ static int ag71xx_rx_packets(struct ag71xx *ag, int limit)
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += pktlen;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5,12,0)
-		skb = build_skb(ring->buf[i].rx_buf, ag71xx_buffer_size(ag));
-#else
 		skb = napi_build_skb(ring->buf[i].rx_buf, ag71xx_buffer_size(ag));
-#endif
 		if (!skb) {
 			skb_free_frag(ring->buf[i].rx_buf);
 			goto next;
@@ -1383,7 +1364,7 @@ next:
 
 	ag71xx_ring_rx_refill(ag);
 
-	list_for_each_entry_safe(skb, next, &rx_list, list)
+	list_for_each_entry(skb, &rx_list, list)
 		skb->protocol = eth_type_trans(skb, dev);
 	netif_receive_skb_list(&rx_list);
 
@@ -1506,7 +1487,7 @@ static const struct net_device_ops ag71xx_netdev_ops = {
 	.ndo_open		= ag71xx_open,
 	.ndo_stop		= ag71xx_stop,
 	.ndo_start_xmit		= ag71xx_hard_start_xmit,
-	.ndo_do_ioctl		= ag71xx_do_ioctl,
+	.ndo_eth_ioctl		= ag71xx_do_ioctl,
 	.ndo_tx_timeout		= ag71xx_tx_timeout,
 	.ndo_change_mtu		= ag71xx_change_mtu,
 	.ndo_set_mac_address	= eth_mac_addr,
@@ -1673,10 +1654,13 @@ static int ag71xx_probe(struct platform_device *pdev)
 	ag->stop_desc->ctrl = 0;
 	ag->stop_desc->next = (u32) ag->stop_desc_dma;
 
-	of_get_mac_address(np, dev->dev_addr);
-	if (!is_valid_ether_addr(dev->dev_addr)) {
+	err = of_get_ethdev_address(np, dev);
+	if (err) {
+		if (err == -EPROBE_DEFER)
+			return err;
+
 		dev_err(&pdev->dev, "invalid MAC address, using random address\n");
-		eth_random_addr(dev->dev_addr);
+		eth_hw_addr_random(dev);
 	}
 
 	err = of_get_phy_mode(np, &ag->phy_if_mode);
@@ -1703,7 +1687,7 @@ static int ag71xx_probe(struct platform_device *pdev)
 			break;
 		}
 
-	netif_napi_add(dev, &ag->napi, ag71xx_poll, AG71XX_NAPI_WEIGHT);
+	netif_napi_add_weight(dev, &ag->napi, ag71xx_poll, AG71XX_NAPI_WEIGHT);
 
 	ag71xx_dump_regs(ag);
 
@@ -1756,20 +1740,20 @@ err_phy_disconnect:
 	return err;
 }
 
-static int ag71xx_remove(struct platform_device *pdev)
+static void ag71xx_remove(struct platform_device *pdev)
 {
 	struct net_device *dev = platform_get_drvdata(pdev);
 	struct ag71xx *ag;
 
 	if (!dev)
-		return 0;
+		return;
 
 	ag = netdev_priv(dev);
 	ag71xx_debugfs_exit(ag);
 	ag71xx_phy_disconnect(ag);
 	unregister_netdev(dev);
 	platform_set_drvdata(pdev, NULL);
-	return 0;
+
 }
 
 static const struct of_device_id ag71xx_match[] = {
@@ -1787,8 +1771,8 @@ static const struct of_device_id ag71xx_match[] = {
 };
 
 static struct platform_driver ag71xx_driver = {
-	.probe		= ag71xx_probe,
-	.remove		= ag71xx_remove,
+	.probe	= ag71xx_probe,
+	.remove	= ag71xx_remove,
 	.driver = {
 		.name	= AG71XX_DRV_NAME,
 		.of_match_table = ag71xx_match,
